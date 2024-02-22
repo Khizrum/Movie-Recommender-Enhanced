@@ -1,4 +1,4 @@
-import numpy as np
+
 import tensorflow as tf
 
 
@@ -44,7 +44,7 @@ def dataset_char():
         [8, 5, 0, 0, 0, 0, 0, 0, 7, 0, 8, 6, 0, 10, 0, 0, 0, 7, 0, 9]], dtype=tf.float32)
 
     # We have associated a category to each movie
-    # categories are mentioned features array above
+    # categories are mentioned in the features array above
 
     movie_feats = tf.constant([
         [1, 1, 0, 0, 1],
@@ -67,6 +67,9 @@ def dataset_char():
         [0, 0, 1, 0, 1],
         [0, 0, 0, 0, 1],
         [0, 0, 0, 0, 1]], dtype=tf.float32)
+
+    # We have associated a language to each movie
+    # languages are mentioned in the language array above
 
     language_feats = tf.constant([
         [1, 0, 0, 0],
@@ -94,71 +97,65 @@ def dataset_char():
 
 
 def favorite_movie_feats():
-    global user_feats
-    global usera_feats
-    global userb_feats
+    global movie_feat_rating
+    global language_rating
 
-    new_row = np.array([0, 0, 0, 0])
     # Matrix Multiplication for finding which user likes which features
-    usera_feats = tf.matmul(user_ratings, movie_feats)
-    userb_feats = tf.matmul(user_ratings, language_feats)
-    #userb_feats = np.vstack([userb_feats, new_row])
-    #user_feats = tf.matmul(usera_feats, userb_feats)
+    movie_feat_rating = tf.matmul(user_ratings, movie_feats)
+    language_rating = tf.matmul(user_ratings, language_feats)
 
 
     # Scale or Standardize the user_feats matrix
-    usera_feats = usera_feats / tf.reduce_sum(usera_feats, axis=1, keepdims=True)
-    userb_feats = userb_feats / tf.reduce_sum(userb_feats, axis=1, keepdims=True)
-    #user_feats = user_feats / tf.reduce_sum(user_feats, axis=1, keepdims=True)
+    movie_feat_rating = movie_feat_rating / tf.reduce_sum(movie_feat_rating, axis=1, keepdims=True)
+    language_rating = language_rating / tf.reduce_sum(language_rating, axis=1, keepdims=True)
 
-    #print(user_feats)
 
 
 def top_features():
-    global top_user_features
     global feature_names
 
-    new_row = np.array([0, 0, 0, 0])
 
-    # This used neural network to give a score to each movie category for each user
-    top_usera_features = tf.nn.top_k(usera_feats, num_features)[1]
-    top_userb_features = tf.nn.top_k(userb_feats, num_languages)[1]
-    top_userb_features = np.vstack([top_userb_features, new_row])
+    # Here we order the features and languages in the descending order based on their scores
+    top_movie_features = tf.nn.top_k(movie_feat_rating, num_features)[1]
+    top_language_features = tf.nn.top_k(language_rating, num_languages)[1]
 
-    #print(top_usera_features)
-    #print(top_userb_features)
 
-    # This is translating each sore into the feature it corresponds to
+    # This is translating each score to the feature it corresponds to
     # thus feature array gets reordered for each user with the most liked feature coming first
 
     for i in range(num_users):
-        feature_names = [features[int(index)] for index in top_usera_features[i]]
+        feature_names = [features[int(index)] for index in top_movie_features[i]]
         print('{}: {}'.format(users[i], feature_names))
+
+    print('\n')
+
     for i in range(num_users):
-        language_names = [language[int(index)] for index in top_userb_features[i]]
+        language_names = [language[int(index)] for index in top_language_features[i]]
         print('{}: {}'.format(users[i], language_names))
+
+    print('\n')
 
 def new_user_ratings():
     global user_ratings_new
 
     # This step helps us calculate even ratings for movies which were rated 0
-    print('new_user_rating \n')
 
-    usera_rate = tf.matmul(usera_feats, tf.transpose(movie_feats))
-    userb_rate = tf.matmul(userb_feats, tf.transpose(language_feats))
+    movie_feat_rate = tf.matmul(movie_feat_rating, tf.transpose(movie_feats))
+    language_rate = tf.matmul(language_rating, tf.transpose(language_feats))
 
-    user_rate = tf.math.add(usera_rate, userb_rate)
+    #This step combines the scores of movie_feat_rate and language_rate for each movie
+    #Thus now each recommendation is made considering both the elements
+    user_rate = tf.math.add(movie_feat_rate, language_rate)
     user_rate = user_rate / tf.reduce_sum(user_rate, axis=1, keepdims=True)
 
-    print(usera_rate)
 
 
 
-
-    #This step helps us in reducing our matrix to only movies which weren't rated or not seen by user
+    #This step helps us in reducing our matrix to only movies which were rated 0 or not seen by user
     user_ratings_new = tf.where(tf.equal(user_ratings, tf.zeros_like(user_ratings)),
                                user_rate, tf.zeros_like(tf.cast(user_ratings, tf.float32))
                                 )
+
 
 
 def movie_recommend():
@@ -170,7 +167,6 @@ def movie_recommend():
         print('{}: {}'.format(users[i], movie_names))
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     data_initialization()
     dataset_char()
@@ -179,4 +175,3 @@ if __name__ == '__main__':
     new_user_ratings()
     movie_recommend()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
